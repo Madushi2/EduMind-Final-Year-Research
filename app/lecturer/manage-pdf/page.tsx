@@ -15,6 +15,13 @@ interface LecturePdf {
   size:        number;
   active:      boolean;
   createdAt:   string;
+  isOwner:     boolean;
+  lecturer:    {
+    id:        string;
+    name:      string;
+    email:     string;
+    position?: string;
+  };
 }
 
 const TOAST_COLORS = {
@@ -104,6 +111,15 @@ function FileNameIcon() {
     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
         d="M7 21h10a2 2 0 002-2V9.5L13.5 4H7a2 2 0 00-2 2v13a2 2 0 002 2z" />
+    </svg>
+  );
+}
+
+function LecturerIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M15 7a3 3 0 11-6 0 3 3 0 016 0zM4 20a8 8 0 0116 0" />
     </svg>
   );
 }
@@ -248,7 +264,7 @@ export default function ManagePdfPage() {
 
       setPdfs((prev) => [data, ...prev]);
       resetForm();
-      push("success", "PDF added", `${data.title} is ready to download.`);
+      push("success", "PDF added", `${data.title} was added by ${data.lecturer?.name ?? "you"}.`);
     } catch {
       push("error", "Upload failed", "Network error. Please try again.");
     } finally {
@@ -499,6 +515,14 @@ export default function ManagePdfPage() {
                       <div className="flex flex-wrap gap-2 mt-3">
                         <span
                           className="inline-flex items-center gap-1.5 min-w-0 max-w-full rounded-lg px-2.5 py-1.5 text-[11px] font-semibold"
+                          style={{ background: pdf.isOwner ? "rgba(232,160,32,0.12)" : "rgba(124,58,237,0.10)", color: pdf.isOwner ? "#b45309" : "#7c3aed" }}
+                          title={pdf.lecturer.email || pdf.lecturer.name}
+                        >
+                          <LecturerIcon />
+                          <span className="truncate">Added by {pdf.isOwner ? "you" : pdf.lecturer.name}</span>
+                        </span>
+                        <span
+                          className="inline-flex items-center gap-1.5 min-w-0 max-w-full rounded-lg px-2.5 py-1.5 text-[11px] font-semibold"
                           style={{ background: "#f8fafc", color: "#64748b" }}
                         >
                           <FileNameIcon />
@@ -514,7 +538,7 @@ export default function ManagePdfPage() {
                       </div>
 
                       <div className="mt-3 flex justify-start">
-                        <ToggleSwitch active={pdf.active} onToggle={() => handleToggleActive(pdf)} />
+                        <ToggleSwitch active={pdf.active} disabled={!pdf.isOwner} onToggle={() => handleToggleActive(pdf)} />
                       </div>
                     </div>
 

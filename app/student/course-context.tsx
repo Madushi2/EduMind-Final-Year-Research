@@ -13,9 +13,11 @@ export interface StudentCourse {
 interface CourseCtx {
   selectedCourse:    StudentCourse | null;
   setSelectedCourse: (course: StudentCourse | null) => void;
+  markNotifRead:     (courseId: string) => void;
 }
 
 export const CourseContext = createContext<CourseCtx>({
   selectedCourse:    null,
   setSelectedCourse: () => {},
+  markNotifRead:     () => {},
 });

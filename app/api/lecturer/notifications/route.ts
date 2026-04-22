@@ -6,6 +6,13 @@ import { getSession } from "@/lib/auth";
 
 const PRIORITIES: NotificationPriority[] = ["low", "normal", "high", "urgent"];
 
+type NotificationLecturer = {
+  _id?: unknown;
+  name?: string;
+  email?: string;
+  position?: string;
+};
+
 async function canAccessCourse(courseId: string, lecturerId: string) {
   return Course.exists({ _id: courseId, lecturers: lecturerId, active: true });
 }
@@ -27,18 +34,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Course not found for this lecturer." }, { status: 404 });
   }
 
-  const notifications = await CourseNotification.find({ course: courseId, lecturer: session.id })
+  const notifications = await CourseNotification.find({ course: courseId })
+    .populate("lecturer", "name email position")
     .sort({ createdAt: -1 })
     .lean();
 
   return NextResponse.json(
-    notifications.map((notification) => ({
-      id: String(notification._id),
-      title: notification.title,
-      description: notification.description,
-      priority: notification.priority,
-      createdAt: notification.createdAt,
-    }))
+    notifications.map((notification) => {
+      const lecturer = notification.lecturer as unknown as NotificationLecturer;
+      const lecturerId = String(lecturer?._id ?? notification.lecturer);
+
+      return {
+        id: String(notification._id),
+        title: notification.title,
+        description: notification.description,
+        priority: notification.priority,
+        createdAt: notification.createdAt,
+        isOwner: lecturerId === session.id,
+        lecturer: {
+          id: lecturerId,
+          name: lecturer?.name ?? "Lecturer",
+          email: lecturer?.email ?? "",
+          position: lecturer?.position ?? "",
+        },
+      };
+    })
   );
 }
 

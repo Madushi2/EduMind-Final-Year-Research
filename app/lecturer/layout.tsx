@@ -7,11 +7,19 @@ import { CourseContext } from "./course-context";
 
 /* ── Types ────────────────────────────────────────────────────── */
 interface Course {
-  id:   string;
-  code: string;
-  name: string;
+  id:       string;
+  code:     string;
+  name:     string;
   semester?: string;
   credits?:  number;
+}
+
+interface CurrentUser {
+  name:            string;
+  email:           string;
+  position?:       string;
+  contact?:        string;
+  profilePicture?: string | null;
 }
 
 interface NavItem {
@@ -26,7 +34,6 @@ interface NavGroup {
   courseOnly: boolean;
 }
 
-/* ── Course Context ───────────────────────────────────────────── */
 /* ── SVG Icons ────────────────────────────────────────────────── */
 const Ic = {
   dashboard: (
@@ -39,6 +46,12 @@ const Ic = {
     <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  ),
+  course: (
+    <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
     </svg>
   ),
   quiz: (
@@ -79,11 +92,6 @@ const Ic = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
     </svg>
   ),
-  search: (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-  ),
   logout: (
     <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
@@ -116,6 +124,227 @@ function Logo() {
   );
 }
 
+function initials(name: string) {
+  return name.split(" ").map((p) => p[0]).join("").toUpperCase().slice(0, 2) || "LC";
+}
+
+/* ── Avatar helper ─────────────────────────────────────────────── */
+function Avatar({
+  user,
+  size,
+  darkBg,
+  onClick,
+}: {
+  user: CurrentUser | null;
+  size: number;
+  darkBg?: boolean;
+  onClick?: () => void;
+}) {
+  const style: React.CSSProperties = {
+    width: size,
+    height: size,
+    borderRadius: "50%",
+    flexShrink: 0,
+    cursor: onClick ? "pointer" : undefined,
+    overflow: "hidden",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  };
+
+  if (user?.profilePicture) {
+    return (
+      <div style={style} onClick={onClick}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={user.profilePicture} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        ...style,
+        background: darkBg ? "#e8a020" : "#1a3262",
+        color:      darkBg ? "#0e1f45" : "#e8a020",
+        fontSize:   size < 36 ? 11 : 14,
+        fontWeight: 900,
+      }}
+      onClick={onClick}
+    >
+      {initials(user?.name ?? "Lecturer")}
+    </div>
+  );
+}
+
+/* ── Profile Popup ─────────────────────────────────────────────── */
+function ProfilePopup({
+  currentUser,
+  onClose,
+  onProfilePictureUpdate,
+}: {
+  currentUser: CurrentUser;
+  onClose: () => void;
+  onProfilePictureUpdate: (url: string) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: "loading" | "success" | "error"; message: string } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || uploading) return;
+    if (!file.type.startsWith("image/")) {
+      const message = "Only image files are allowed.";
+      setError(message);
+      setToast({ type: "error", message });
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      const message = "Image must be 2 MB or smaller.";
+      setError(message);
+      setToast({ type: "error", message });
+      return;
+    }
+
+    setError(null);
+    setToast({ type: "loading", message: "Uploading profile picture..." });
+    setUploading(true);
+    const form = new FormData();
+    form.append("profilePicture", file);
+    try {
+      const res = await fetch("/api/lecturer/me", { method: "PATCH", body: form });
+      const data = await res.json();
+      if (!res.ok || typeof data.profilePicture !== "string") {
+        const message = data.error ?? "Upload failed.";
+        setError(message);
+        setToast({ type: "error", message });
+        return;
+      }
+      onProfilePictureUpdate(data.profilePicture);
+      setToast({ type: "success", message: "Profile picture saved." });
+      setTimeout(() => setToast(null), 2400);
+    } catch {
+      const message = "Upload failed. Please try again.";
+      setError(message);
+      setToast({ type: "error", message });
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  const fields = [
+    { label: "Email",    value: currentUser.email },
+    { label: "Position", value: currentUser.position || "—" },
+    { label: "Contact",  value: currentUser.contact  || "—" },
+  ];
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(14,31,69,0.55)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={onClose}
+    >
+      {toast && (
+        <div
+          role="status"
+          style={{
+            position: "absolute",
+            top: 18,
+            right: 18,
+            maxWidth: 300,
+            padding: "10px 14px",
+            borderRadius: 12,
+            background: toast.type === "success" ? "#dcfce7" : toast.type === "error" ? "#fee2e2" : "#eff6ff",
+            color: toast.type === "success" ? "#166534" : toast.type === "error" ? "#991b1b" : "#1d4ed8",
+            border: `1px solid ${toast.type === "success" ? "#bbf7d0" : toast.type === "error" ? "#fecaca" : "#bfdbfe"}`,
+            boxShadow: "0 12px 32px rgba(14,31,69,0.18)",
+            fontSize: 13,
+            fontWeight: 800,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {toast.message}
+        </div>
+      )}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: "white", borderRadius: 20, width: "100%", maxWidth: 380, boxShadow: "0 24px 64px rgba(14,31,69,0.22)", overflow: "hidden" }}
+      >
+        {/* Header band */}
+        <div style={{ background: "#0e1f45", padding: "24px 24px 48px", position: "relative" }}>
+          <button
+            onClick={onClose}
+            style={{ position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 8, padding: 6, color: "white", cursor: "pointer", display: "flex" }}
+          >
+            {Ic.close}
+          </button>
+          <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Lecturer Profile</div>
+          <div style={{ color: "white", fontSize: 18, fontWeight: 900, marginTop: 4 }}>{currentUser.name}</div>
+        </div>
+
+        {/* Avatar upload ring */}
+        <div style={{ display: "flex", justifyContent: "center", marginTop: -36 }}>
+          <div style={{ position: "relative" }}>
+            <div
+              style={{ width: 72, height: 72, borderRadius: "50%", border: "4px solid white", overflow: "hidden", cursor: uploading ? "wait" : "pointer", background: "#e8a020", opacity: uploading ? 0.72 : 1 }}
+              onClick={() => { if (!uploading) fileRef.current?.click(); }}
+            >
+              {currentUser.profilePicture ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={currentUser.profilePicture} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#0e1f45", fontSize: 22, fontWeight: 900 }}>
+                  {initials(currentUser.name)}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => { if (!uploading) fileRef.current?.click(); }}
+              disabled={uploading}
+              style={{ position: "absolute", bottom: 0, right: 0, width: 24, height: 24, borderRadius: "50%", background: "#e8a020", border: "2px solid white", cursor: uploading ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+            >
+              {uploading ? (
+                <div style={{ width: 10, height: 10, borderRadius: "50%", border: "2px solid #0e1f45", borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />
+              ) : (
+                <svg width="11" height="11" fill="none" stroke="#0e1f45" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <circle cx="12" cy="13" r="3" strokeWidth={2.5} />
+                </svg>
+              )}
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" disabled={uploading} onChange={handleFileChange} style={{ display: "none" }} />
+          </div>
+        </div>
+
+        {/* Tap to upload hint */}
+        <div style={{ textAlign: "center", marginTop: 8, marginBottom: 4 }}>
+          <button disabled={uploading} onClick={() => fileRef.current?.click()} style={{ fontSize: 11, color: uploading ? "#64748b" : "#94a3b8", background: "none", border: "none", cursor: uploading ? "wait" : "pointer" }}>
+            {uploading ? "Uploading…" : "Tap to change photo"}
+          </button>
+        </div>
+
+        {error && (
+          <div style={{ margin: "0 24px 8px", padding: "8px 12px", borderRadius: 8, background: "rgba(220,38,38,0.08)", color: "#dc2626", fontSize: 12, textAlign: "center" }}>{error}</div>
+        )}
+
+        {/* Details */}
+        <div style={{ padding: "8px 24px 24px" }}>
+          {fields.map(({ label, value }) => (
+            <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #f1f5f9" }}>
+              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>{label}</span>
+              <span style={{ fontSize: 13, color: "#1e293b", fontWeight: 600, maxWidth: 220, textAlign: "right", wordBreak: "break-word" }}>{value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
 /* ── Nav groups ───────────────────────────────────────────────── */
 function buildNavGroups(course: Course | null): NavGroup[] {
   return [
@@ -130,10 +359,11 @@ function buildNavGroups(course: Course | null): NavGroup[] {
       label:      course ? course.code : "Course",
       courseOnly: true,
       items: [
-        { label: "Manage PDF",           href: "/lecturer/manage-pdf",    icon: Ic.pdf          },
-        { label: "Generate Quiz",        href: "/lecturer/generate-quiz", icon: Ic.quiz         },
-        { label: "Students",             href: "/lecturer/students",      icon: Ic.students     },
-        { label: "Notifications", href: "/lecturer/notifications", icon: Ic.bell         },
+        { label: "Course",        href: "/lecturer/course",         icon: Ic.course   },
+        { label: "Manage PDF",    href: "/lecturer/manage-pdf",    icon: Ic.pdf      },
+        { label: "Generate Quiz", href: "/lecturer/generate-quiz", icon: Ic.quiz     },
+        { label: "Students",      href: "/lecturer/students",      icon: Ic.students },
+        { label: "Notifications", href: "/lecturer/notifications", icon: Ic.bell     },
       ],
     },
   ];
@@ -145,15 +375,19 @@ function Sidebar({
   mobileOpen,
   pathname,
   selectedCourse,
+  currentUser,
   onClose,
   onLogout,
+  onOpenProfile,
 }: {
   collapsed:      boolean;
   mobileOpen:     boolean;
   pathname:       string;
   selectedCourse: Course | null;
+  currentUser:    CurrentUser | null;
   onClose:        () => void;
   onLogout:       () => void;
+  onOpenProfile:  () => void;
 }) {
   const navGroups = buildNavGroups(selectedCourse);
   const w = collapsed ? 72 : 260;
@@ -164,99 +398,61 @@ function Sidebar({
 
   return (
     <>
-      {/* Mobile overlay */}
       {mobileOpen && (
-        <div
-          className="fixed inset-0 z-20 bg-black/50 md:hidden"
-          style={{ cursor: "pointer" }}
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 z-20 bg-black/50 md:hidden" style={{ cursor: "pointer" }} onClick={onClose} />
       )}
 
       <aside
         className="fixed left-0 top-0 z-30 flex flex-col h-screen overflow-hidden transition-all duration-300 ease-in-out"
-        style={{
-          width:     w,
-          background: "#0e1f45",
-          boxShadow: "4px 0 24px rgba(0,0,0,0.18)",
-          transform: mobileOpen ? "translateX(0)" : undefined,
-        }}
+        style={{ width: w, background: "#0e1f45", boxShadow: "4px 0 24px rgba(0,0,0,0.18)", transform: mobileOpen ? "translateX(0)" : undefined }}
       >
-        {/* Logo header */}
-        <div
-          className="flex items-center gap-3 px-4 shrink-0 border-b"
-          style={{ height: 64, borderColor: "rgba(255,255,255,0.07)" }}
-        >
+        <div className="flex items-center gap-3 px-4 shrink-0 border-b" style={{ height: 64, borderColor: "rgba(255,255,255,0.07)" }}>
           <div className="w-9 h-9 shrink-0"><Logo /></div>
           {!collapsed && (
             <div className="overflow-hidden">
               <div className="text-white font-black text-lg leading-none whitespace-nowrap">
                 Edu<span style={{ color: "#e8a020" }}>Mind</span>
               </div>
-              <div
-                className="text-[9px] font-semibold tracking-widest uppercase mt-0.5 whitespace-nowrap"
-                style={{ color: "rgba(255,255,255,0.35)" }}
-              >
+              <div className="text-[9px] font-semibold tracking-widest uppercase mt-0.5 whitespace-nowrap" style={{ color: "rgba(255,255,255,0.35)" }}>
                 Lecturer Portal
               </div>
             </div>
           )}
-          <button
-            onClick={onClose}
-            className="ml-auto md:hidden p-1 rounded-lg"
-            style={{ color: "rgba(255,255,255,0.4)", cursor: "pointer" }}
-          >
+          <button onClick={onClose} className="ml-auto md:hidden p-1 rounded-lg" style={{ color: "rgba(255,255,255,0.4)", cursor: "pointer" }}>
             {Ic.close}
           </button>
         </div>
 
-        {/* Selected course pill (expanded only) */}
         {!collapsed && selectedCourse && (
-          <div
-            className="mx-3 mt-3 px-3 py-2 rounded-xl flex items-center gap-2"
-            style={{ background: "rgba(232,160,32,0.12)", border: "1px solid rgba(232,160,32,0.25)" }}
-          >
+          <div className="mx-3 mt-3 px-3 py-2 rounded-xl flex items-center gap-2" style={{ background: "rgba(232,160,32,0.12)", border: "1px solid rgba(232,160,32,0.25)" }}>
             <span style={{ color: "#e8a020" }}>{Ic.book}</span>
             <div className="overflow-hidden flex-1 min-w-0">
-              <div className="text-[10px] font-black tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.35)" }}>
-                Active Course
-              </div>
+              <div className="text-[10px] font-black tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.35)" }}>Active Course</div>
               <div className="text-white text-xs font-bold truncate">{selectedCourse.code}</div>
-              <div className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.45)" }}>
-                {selectedCourse.name}
-              </div>
+              <div className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.45)" }}>{selectedCourse.name}</div>
             </div>
           </div>
         )}
 
-        {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-6">
           {navGroups.map((group) => {
             const noCourse = group.courseOnly && !selectedCourse;
             return (
               <div key={group.label}>
                 {!collapsed && (
-                  <div
-                    className="text-[9px] font-black tracking-widest uppercase px-3 mb-2 flex items-center gap-1.5"
-                    style={{ color: noCourse ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.28)" }}
-                  >
+                  <div className="text-[9px] font-black tracking-widest uppercase px-3 mb-2 flex items-center gap-1.5" style={{ color: noCourse ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.28)" }}>
                     {group.label}
                     {group.courseOnly && !selectedCourse && (
-                      <span
-                        className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full"
-                        style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.3)" }}
-                      >
+                      <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.3)" }}>
                         select a course
                       </span>
                     )}
                   </div>
                 )}
-
                 <div className="space-y-0.5">
                   {group.items.map((item) => {
                     const active   = isActive(item.href);
                     const disabled = group.courseOnly && !selectedCourse;
-
                     return (
                       <Link
                         key={item.href}
@@ -268,39 +464,15 @@ function Sidebar({
                           padding:        collapsed ? "10px 0" : "10px 12px",
                           justifyContent: collapsed ? "center" : "flex-start",
                           background:     active ? "rgba(255,255,255,0.97)" : "transparent",
-                          color:          active
-                            ? "#1a3262"
-                            : disabled
-                            ? "rgba(255,255,255,0.22)"
-                            : "rgba(255,255,255,0.62)",
-                          cursor: disabled ? "not-allowed" : "pointer",
+                          color:          active ? "#1a3262" : disabled ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.62)",
+                          cursor:         disabled ? "not-allowed" : "pointer",
                         }}
-                        onMouseEnter={(e) => {
-                          if (!active && !disabled)
-                            (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.07)";
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!active)
-                            (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
-                        }}
+                        onMouseEnter={(e) => { if (!active && !disabled) (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.07)"; }}
+                        onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; }}
                       >
-                        {/* Gold left bar on active */}
-                        {active && (
-                          <span
-                            className="absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full"
-                            style={{ height: 28, background: "#e8a020" }}
-                          />
-                        )}
-
-                        <span style={{ color: active ? "#1a3262" : undefined }}>
-                          {item.icon}
-                        </span>
-
-                        {!collapsed && (
-                          <span className={`text-sm truncate flex-1 ${active ? "font-bold" : "font-semibold"}`}>
-                            {item.label}
-                          </span>
-                        )}
+                        {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full" style={{ height: 28, background: "#e8a020" }} />}
+                        <span style={{ color: active ? "#1a3262" : undefined }}>{item.icon}</span>
+                        {!collapsed && <span className={`text-sm truncate flex-1 ${active ? "font-bold" : "font-semibold"}`}>{item.label}</span>}
                       </Link>
                     );
                   })}
@@ -310,49 +482,31 @@ function Sidebar({
           })}
         </nav>
 
-        {/* User footer */}
-        <div
-          className="shrink-0 border-t"
-          style={{
-            borderColor: "rgba(255,255,255,0.07)",
-            padding: collapsed ? "12px 8px" : "12px 16px",
-          }}
-        >
+        <div className="shrink-0 border-t" style={{ borderColor: "rgba(255,255,255,0.07)", padding: collapsed ? "12px 8px" : "12px 16px" }}>
           {!collapsed ? (
-            <div className="flex items-center gap-3 mb-3">
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black shrink-0"
-                style={{ background: "#e8a020", color: "#0e1f45" }}
-              >
-                LC
-              </div>
+            <button
+              onClick={onOpenProfile}
+              className="flex items-center gap-3 mb-3 w-full rounded-xl px-2 py-1.5 transition-all text-left"
+              style={{ cursor: "pointer", background: "transparent" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            >
+              <Avatar user={currentUser} size={36} darkBg />
               <div className="overflow-hidden flex-1">
-                <div className="text-white text-xs font-bold truncate">Lecturer</div>
-                <div className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.38)" }}>
-                  lecturer@edumind.ac
-                </div>
+                <div className="text-white text-xs font-bold truncate">{currentUser?.name ?? "Lecturer"}</div>
+                <div className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.38)" }}>{currentUser?.email ?? "lecturer@edumind.ac"}</div>
               </div>
-            </div>
+            </button>
           ) : (
             <div className="flex justify-center mb-3">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black"
-                style={{ background: "#e8a020", color: "#0e1f45" }}
-              >
-                LC
-              </div>
+              <Avatar user={currentUser} size={32} darkBg onClick={onOpenProfile} />
             </div>
           )}
 
           <button
             onClick={onLogout}
             className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all"
-            style={{
-              background:     "rgba(220,38,38,0.12)",
-              color:          "rgba(248,113,113,0.9)",
-              justifyContent: collapsed ? "center" : "flex-start",
-              cursor:         "pointer",
-            }}
+            style={{ background: "rgba(220,38,38,0.12)", color: "rgba(248,113,113,0.9)", justifyContent: collapsed ? "center" : "flex-start", cursor: "pointer" }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(220,38,38,0.22)"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(220,38,38,0.12)"; }}
             title={collapsed ? "Sign Out" : undefined}
@@ -394,20 +548,10 @@ function CourseSelector({
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all"
-        style={{
-          background: selectedCourse ? "#1a3262" : "transparent",
-          border:     `1.5px solid ${selectedCourse ? "#1a3262" : "#e2e8f0"}`,
-          color:      selectedCourse ? "white" : "#64748b",
-          cursor:     "pointer",
-        }}
-        onMouseEnter={(e) => {
-          if (!selectedCourse) (e.currentTarget as HTMLButtonElement).style.background = "#f8fafc";
-        }}
-        onMouseLeave={(e) => {
-          if (!selectedCourse) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-        }}
+        style={{ background: selectedCourse ? "#1a3262" : "transparent", border: `1.5px solid ${selectedCourse ? "#1a3262" : "#e2e8f0"}`, color: selectedCourse ? "white" : "#64748b", cursor: "pointer" }}
+        onMouseEnter={(e) => { if (!selectedCourse) (e.currentTarget as HTMLButtonElement).style.background = "#f8fafc"; }}
+        onMouseLeave={(e) => { if (!selectedCourse) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
       >
-        {/* Book icon */}
         <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
             d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -416,59 +560,25 @@ function CourseSelector({
         <span className="hidden sm:inline whitespace-nowrap">
           {selectedCourse ? (
             <span className="flex items-center gap-1.5">
-              <span
-                className="text-[10px] font-black px-1.5 py-0.5 rounded-md"
-                style={{ background: "#e8a020", color: "#0e1f45" }}
-              >
-                {selectedCourse.code}
-              </span>
-              <span className="hidden md:inline text-white/80 text-xs font-medium truncate max-w-[140px]">
-                {selectedCourse.name}
-              </span>
+              <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md" style={{ background: "#e8a020", color: "#0e1f45" }}>{selectedCourse.code}</span>
+              <span className="hidden md:inline text-white/80 text-xs font-medium truncate max-w-[140px]">{selectedCourse.name}</span>
             </span>
-          ) : loading ? (
-            "Loading Courses"
-          ) : (
-            "Select Course"
-          )}
+          ) : loading ? "Loading Courses" : "Select Course"}
         </span>
 
-        <span
-          className="transition-transform duration-200"
-          style={{
-            transform:  open ? "rotate(180deg)" : "rotate(0deg)",
-            color:      selectedCourse ? "rgba(255,255,255,0.6)" : "#94a3b8",
-          }}
-        >
+        <span className="transition-transform duration-200" style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)", color: selectedCourse ? "rgba(255,255,255,0.6)" : "#94a3b8" }}>
           {Ic.chevronDown}
         </span>
       </button>
 
-      {/* Dropdown */}
       {open && (
-        <div
-          className="absolute top-full mt-2 right-0 z-50 rounded-2xl overflow-hidden"
-          style={{
-            minWidth:  260,
-            background: "white",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
-            border:    "1px solid #e2e8f0",
-          }}
-        >
-          {/* Dropdown header */}
-          <div
-            className="px-4 py-3 border-b"
-            style={{ background: "#f8fafc", borderColor: "#e2e8f0" }}
-          >
-            <div className="text-[10px] font-black tracking-widest uppercase" style={{ color: "#94a3b8" }}>
-              Assigned Courses
-            </div>
+        <div className="absolute top-full mt-2 right-0 z-50 rounded-2xl overflow-hidden" style={{ minWidth: 260, background: "white", boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)", border: "1px solid #e2e8f0" }}>
+          <div className="px-4 py-3 border-b" style={{ background: "#f8fafc", borderColor: "#e2e8f0" }}>
+            <div className="text-[10px] font-black tracking-widest uppercase" style={{ color: "#94a3b8" }}>Assigned Courses</div>
             <div className="text-xs font-medium mt-0.5" style={{ color: "#64748b" }}>
               {loading ? "Loading assigned courses" : `${courses.length} course${courses.length !== 1 ? "s" : ""} assigned`}
             </div>
           </div>
-
-          {/* Course list */}
           <div className="py-1.5 max-h-64 overflow-y-auto">
             {loading ? (
               <div className="px-4 py-5 space-y-2">
@@ -489,40 +599,16 @@ function CourseSelector({
                     key={course.id}
                     onClick={() => { onSelect(course); setOpen(false); }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all"
-                    style={{
-                      background: isSelected ? "rgba(26,50,98,0.06)" : "transparent",
-                      cursor: "pointer",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = "#f8fafc";
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                    }}
+                    style={{ background: isSelected ? "rgba(26,50,98,0.06)" : "transparent", cursor: "pointer" }}
+                    onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = "#f8fafc"; }}
+                    onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
                   >
-                    {/* Course code badge */}
-                    <span
-                      className="shrink-0 text-[10px] font-black px-2 py-1 rounded-lg"
-                      style={{
-                        background: isSelected ? "#1a3262" : "#f1f5f9",
-                        color:      isSelected ? "white"   : "#475569",
-                        minWidth:   52,
-                        textAlign:  "center",
-                      }}
-                    >
+                    <span className="shrink-0 text-[10px] font-black px-2 py-1 rounded-lg" style={{ background: isSelected ? "#1a3262" : "#f1f5f9", color: isSelected ? "white" : "#475569", minWidth: 52, textAlign: "center" }}>
                       {course.code}
                     </span>
-
                     <div className="flex-1 min-w-0">
-                      <div
-                        className="text-sm font-semibold truncate"
-                        style={{ color: isSelected ? "#1a3262" : "#334155" }}
-                      >
-                        {course.name}
-                      </div>
+                      <div className="text-sm font-semibold truncate" style={{ color: isSelected ? "#1a3262" : "#334155" }}>{course.name}</div>
                     </div>
-
-                    {/* Check mark on selected */}
                     {isSelected && (
                       <svg className="w-4 h-4 shrink-0" fill="none" stroke="#1a3262" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -545,42 +631,36 @@ function Header({
   pathname,
   courses,
   selectedCourse,
+  currentUser,
   coursesLoading,
   onToggleSidebar,
   onMobileOpen,
   onSelectCourse,
+  onOpenProfile,
 }: {
   collapsed:       boolean;
   pathname:        string;
   courses:         Course[];
   selectedCourse:  Course | null;
+  currentUser:     CurrentUser | null;
   coursesLoading:  boolean;
   onToggleSidebar: () => void;
   onMobileOpen:    () => void;
   onSelectCourse:  (c: Course) => void;
+  onOpenProfile:   () => void;
 }) {
   const sidebarW = collapsed ? 72 : 260;
-
   const crumb = (() => {
     if (pathname === "/lecturer") return "Dashboard";
     const seg = pathname.split("/")[2];
-    return seg
-      ? seg.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
-      : "Dashboard";
+    return seg ? seg.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") : "Dashboard";
   })();
 
   return (
     <header
       className="fixed top-0 right-0 z-20 flex items-center gap-3 bg-white border-b transition-all duration-300"
-      style={{
-        left:        sidebarW,
-        height:      64,
-        borderColor: "#e2e8f0",
-        padding:     "0 20px",
-        boxShadow:   "0 1px 3px rgba(0,0,0,0.06)",
-      }}
+      style={{ left: sidebarW, height: 64, borderColor: "#e2e8f0", padding: "0 20px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
     >
-      {/* Desktop collapse toggle */}
       <button
         onClick={onToggleSidebar}
         className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-all"
@@ -591,37 +671,22 @@ function Header({
         {collapsed ? Ic.chevronRight : Ic.chevronLeft}
       </button>
 
-      {/* Mobile hamburger */}
-      <button
-        onClick={onMobileOpen}
-        className="flex md:hidden items-center justify-center w-8 h-8 rounded-lg"
-        style={{ color: "#64748b", cursor: "pointer" }}
-      >
+      <button onClick={onMobileOpen} className="flex md:hidden items-center justify-center w-8 h-8 rounded-lg" style={{ color: "#64748b", cursor: "pointer" }}>
         {Ic.menu}
       </button>
 
-      {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm">
         <span style={{ color: "#94a3b8" }}>Lecturer</span>
         <span style={{ color: "#cbd5e1" }}>/</span>
         <span className="font-bold" style={{ color: "#1a3262" }}>{crumb}</span>
       </div>
 
-      {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Course selector */}
-      <CourseSelector
-        courses={courses}
-        selectedCourse={selectedCourse}
-        loading={coursesLoading}
-        onSelect={onSelectCourse}
-      />
+      <CourseSelector courses={courses} selectedCourse={selectedCourse} loading={coursesLoading} onSelect={onSelectCourse} />
 
-      {/* Divider */}
       <div className="w-px h-6 hidden sm:block" style={{ background: "#e2e8f0" }} />
 
-      {/* Notification bell */}
       <button
         className="relative flex items-center justify-center w-9 h-9 rounded-xl transition-all"
         style={{ color: "#64748b", cursor: "pointer" }}
@@ -631,22 +696,21 @@ function Header({
         {Ic.bell}
       </button>
 
-      {/* Divider */}
       <div className="w-px h-6" style={{ background: "#e2e8f0" }} />
 
-      {/* User pill */}
-      <div className="flex items-center gap-2.5">
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black"
-          style={{ background: "#1a3262", color: "#e8a020" }}
-        >
-          LC
-        </div>
+      <button
+        onClick={onOpenProfile}
+        className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 transition-all"
+        style={{ cursor: "pointer", background: "transparent" }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+      >
+        <Avatar user={currentUser} size={32} />
         <div className="hidden sm:block">
-          <div className="text-xs font-bold leading-none mb-0.5" style={{ color: "#1a3262" }}>Lecturer</div>
-          <div className="text-[10px]" style={{ color: "#94a3b8" }}>Instructor</div>
+          <div className="text-xs font-bold leading-none mb-0.5 text-left" style={{ color: "#1a3262" }}>{currentUser?.name ?? "Lecturer"}</div>
+          <div className="text-[10px]" style={{ color: "#94a3b8" }}>{currentUser?.position || "Instructor"}</div>
         </div>
-      </div>
+      </button>
     </header>
   );
 }
@@ -654,56 +718,65 @@ function Header({
 /* ══════════════════════════════════════════════════════════════ */
 /* LAYOUT                                                         */
 /* ══════════════════════════════════════════════════════════════ */
-
-/* Mock courses — replace with API call when endpoint is ready */
 export default function LecturerLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter();
   const pathname = usePathname();
 
-  const [collapsed,      setCollapsed     ] = useState(false);
-  const [mobileOpen,     setMobileOpen    ] = useState(false);
-  const [courses,        setCourses       ] = useState<Course[]>([]);
-  const [coursesLoading, setCoursesLoading] = useState(true);
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [collapsed,       setCollapsed      ] = useState(false);
+  const [mobileOpen,      setMobileOpen     ] = useState(false);
+  const [courses,         setCourses        ] = useState<Course[]>([]);
+  const [coursesLoading,  setCoursesLoading ] = useState(true);
+  const [selectedCourse,  setSelectedCourse ] = useState<Course | null>(null);
+  const [currentUser,     setCurrentUser    ] = useState<CurrentUser | null>(null);
+  const [profilePopupOpen, setProfilePopupOpen] = useState(false);
 
-  /* Restore sidebar preference */
   useEffect(() => {
     const storedCollapsed = localStorage.getItem("em_lec_sidebar_collapsed");
-    if (storedCollapsed === "true") {
-      setTimeout(() => setCollapsed(true), 0);
-    }
+    if (storedCollapsed === "true") setTimeout(() => setCollapsed(true), 0);
   }, []);
 
   useEffect(() => {
     const storedCourse = localStorage.getItem("em_lec_selected_course");
-
     fetch("/api/lecturer/courses")
       .then((res) => {
-        if (res.status === 403) {
-          router.push("/login");
-          return [];
-        }
+        if (res.status === 403) { router.push("/login"); return []; }
         return res.json();
       })
       .then((data) => {
         const assigned = Array.isArray(data) ? data : [];
         setCourses(assigned);
-
         if (!storedCourse) return;
         try {
           const parsed = JSON.parse(storedCourse) as Course;
           const restored = assigned.find((course) => course.id === parsed.id);
-          if (restored) {
-            setSelectedCourse(restored);
-          } else {
-            localStorage.removeItem("em_lec_selected_course");
-          }
+          if (restored) setSelectedCourse(restored);
+          else localStorage.removeItem("em_lec_selected_course");
         } catch {
           localStorage.removeItem("em_lec_selected_course");
         }
       })
       .catch(() => setCourses([]))
       .finally(() => setCoursesLoading(false));
+  }, [router]);
+
+  useEffect(() => {
+    fetch("/api/lecturer/me")
+      .then((res) => {
+        if (res.status === 403) { router.push("/login"); return null; }
+        return res.json();
+      })
+      .then((data) => {
+        if (data && typeof data.name === "string") {
+          setCurrentUser({
+            name:           data.name,
+            email:          data.email          ?? "",
+            position:       data.position        ?? "",
+            contact:        data.contact         ?? "",
+            profilePicture: data.profilePicture  ?? null,
+          });
+        }
+      })
+      .catch(() => {});
   }, [router]);
 
   function toggleSidebar() {
@@ -720,16 +793,17 @@ export default function LecturerLayout({ children }: { children: React.ReactNode
 
   function handleSetSelectedCourse(course: Course | null) {
     setSelectedCourse(course);
-    if (course) {
-      localStorage.setItem("em_lec_selected_course", JSON.stringify(course));
-    } else {
-      localStorage.removeItem("em_lec_selected_course");
-    }
+    if (course) localStorage.setItem("em_lec_selected_course", JSON.stringify(course));
+    else localStorage.removeItem("em_lec_selected_course");
   }
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
+  }
+
+  function handleProfilePictureUpdate(url: string) {
+    setCurrentUser((prev) => prev ? { ...prev, profilePicture: url } : prev);
   }
 
   const sidebarW = collapsed ? 72 : 260;
@@ -742,30 +816,35 @@ export default function LecturerLayout({ children }: { children: React.ReactNode
           mobileOpen={mobileOpen}
           pathname={pathname}
           selectedCourse={selectedCourse}
+          currentUser={currentUser}
           onClose={() => setMobileOpen(false)}
           onLogout={handleLogout}
+          onOpenProfile={() => setProfilePopupOpen(true)}
         />
-
-        <div
-          className="flex flex-col min-h-screen transition-all duration-300"
-          style={{ marginLeft: sidebarW }}
-        >
+        <div className="flex flex-col min-h-screen transition-all duration-300" style={{ marginLeft: sidebarW }}>
           <Header
             collapsed={collapsed}
             pathname={pathname}
             courses={courses}
             selectedCourse={selectedCourse}
+            currentUser={currentUser}
             coursesLoading={coursesLoading}
             onToggleSidebar={toggleSidebar}
             onMobileOpen={() => setMobileOpen(true)}
             onSelectCourse={handleSelectCourse}
+            onOpenProfile={() => setProfilePopupOpen(true)}
           />
-
-          <main className="flex-1 overflow-y-auto" style={{ paddingTop: 64 }}>
-            {children}
-          </main>
+          <main className="flex-1 overflow-y-auto" style={{ paddingTop: 64 }}>{children}</main>
         </div>
       </div>
+
+      {profilePopupOpen && currentUser && (
+        <ProfilePopup
+          currentUser={currentUser}
+          onClose={() => setProfilePopupOpen(false)}
+          onProfilePictureUpdate={handleProfilePictureUpdate}
+        />
+      )}
     </CourseContext.Provider>
   );
 }

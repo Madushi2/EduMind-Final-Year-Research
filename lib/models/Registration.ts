@@ -16,6 +16,12 @@ export interface IRegistration extends Document {
   age?:            number;
   /* lecturer-only */
   position?:       string;
+  /* shared */
+  profilePicture?:         string;
+  profilePictureData?:     Buffer;
+  profilePictureMimeType?: string;
+  profilePictureSize?:     number;
+  profilePictureFileName?: string;
   createdAt:       Date;
   updatedAt:       Date;
 }
@@ -34,6 +40,12 @@ const RegistrationSchema = new Schema<IRegistration>(
     age:           { type: Number },
     /* lecturer */
     position:      { type: String },
+    /* shared */
+    profilePicture:         { type: String },
+    profilePictureData:     { type: Buffer },
+    profilePictureMimeType: { type: String },
+    profilePictureSize:     { type: Number },
+    profilePictureFileName: { type: String },
   },
   { timestamps: true }
 );

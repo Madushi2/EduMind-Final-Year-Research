@@ -22,7 +22,7 @@ export async function GET(
   }
 
   const allowed = await Course.exists({ _id: pdf.course, lecturers: session.id, active: true });
-  if (!allowed || String(pdf.lecturer) !== session.id) {
+  if (!allowed) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

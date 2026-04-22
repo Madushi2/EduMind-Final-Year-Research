@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 
   // Notify assigned lecturers via email (fire-and-forget)
   if (assignedLecturerIds.length > 0) {
-    const lecturers = populated.lecturers as Array<{ name: string; email: string }>;
+    const lecturers = populated.lecturers as unknown as Array<{ name: string; email: string }>;
     Promise.allSettled(
       lecturers.map((l) =>
         sendCourseAssignmentEmail(l.name, l.email, populated.name, populated.code, populated.semester, populated.credits)

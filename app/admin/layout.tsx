@@ -127,12 +127,12 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Exhibitions",  href: "/admin/exhibitions",  icon: Ic.gallery },
     ],
   },
-  {
-    label: "System",
-    items: [
-      { label: "Notifications", href: "/admin/notifications", icon: Ic.bell },
-    ],
-  },
+  // {
+  //   label: "System",
+  //   items: [
+  //     { label: "Notifications", href: "/admin/notifications", icon: Ic.bell },
+  //   ],
+  // },
 ];
 
 /* ── Logo ─────────────────────────────────────────────────────── */

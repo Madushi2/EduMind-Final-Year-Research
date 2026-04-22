@@ -8,35 +8,33 @@ const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
 
 export async function GET() {
   const session = await getSession();
-  if (session?.role !== "student") {
+  if (session?.role !== "lecturer") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   await connectDB();
 
-  const student = await Registration.findOne({ _id: session.id, role: "student" })
-    .select("name email contact semester gender age profilePicture profilePictureData profilePictureMimeType")
+  const lecturer = await Registration.findOne({ _id: session.id, role: "lecturer" })
+    .select("name email contact position profilePicture profilePictureData profilePictureMimeType")
     .lean();
 
-  if (!student) {
-    return NextResponse.json({ error: "Student not found." }, { status: 404 });
+  if (!lecturer) {
+    return NextResponse.json({ error: "Lecturer not found." }, { status: 404 });
   }
 
   return NextResponse.json({
-    id: String(student._id),
-    name: student.name,
-    email: student.email,
-    contact: student.contact,
-    semester: student.semester ?? "",
-    gender: student.gender ?? "",
-    age: student.age ?? null,
-    profilePicture: profilePictureToDataUrl(student),
+    id: String(lecturer._id),
+    name: lecturer.name,
+    email: lecturer.email,
+    contact: lecturer.contact,
+    position: lecturer.position ?? "",
+    profilePicture: profilePictureToDataUrl(lecturer),
   });
 }
 
 export async function PATCH(req: NextRequest) {
   const session = await getSession();
-  if (session?.role !== "student") {
+  if (session?.role !== "lecturer") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -57,8 +55,8 @@ export async function PATCH(req: NextRequest) {
   const profilePicture = `data:${file.type};base64,${profilePictureData.toString("base64")}`;
 
   await connectDB();
-  const student = await Registration.findOneAndUpdate(
-    { _id: session.id, role: "student" },
+  const lecturer = await Registration.findOneAndUpdate(
+    { _id: session.id, role: "lecturer" },
     {
       $set: {
         profilePicture,
@@ -71,9 +69,9 @@ export async function PATCH(req: NextRequest) {
     { new: true, runValidators: true }
   ).select("profilePicture profilePictureData profilePictureMimeType");
 
-  if (!student) {
-    return NextResponse.json({ error: "Student not found." }, { status: 404 });
+  if (!lecturer) {
+    return NextResponse.json({ error: "Lecturer not found." }, { status: 404 });
   }
 
-  return NextResponse.json({ profilePicture: profilePictureToDataUrl(student) });
+  return NextResponse.json({ profilePicture: profilePictureToDataUrl(lecturer) });
 }

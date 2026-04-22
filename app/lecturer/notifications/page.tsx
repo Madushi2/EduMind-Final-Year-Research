@@ -12,6 +12,13 @@ interface CourseNotification {
   description: string;
   priority:    Priority;
   createdAt:   string;
+  isOwner?:     boolean;
+  lecturer?: {
+    id:        string;
+    name:      string;
+    email:     string;
+    position?: string;
+  };
 }
 
 interface Toast {
@@ -348,8 +355,19 @@ export default function LecturerNotificationsPage() {
                           <PriorityPill priority={notification.priority} />
                         </div>
                         <p className="text-sm mt-2 leading-relaxed" style={{ color: "#475569" }}>{notification.description}</p>
-                        <div className="mt-3 text-[11px] font-semibold" style={{ color: "#94a3b8" }}>
-                          Added {new Date(notification.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold" style={{ color: "#94a3b8" }}>
+                          <span>
+                            Added by {notification.isOwner ? "you" : notification.lecturer?.name ?? "Lecturer"}
+                          </span>
+                          <span style={{ color: "#cbd5e1" }}>•</span>
+                          <span>
+                            {new Date(notification.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                          </span>
+                          {notification.lecturer?.position && (
+                            <span className="rounded-full px-2 py-0.5" style={{ background: "rgba(26,50,98,0.06)", color: "#64748b" }}>
+                              {notification.lecturer.position}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

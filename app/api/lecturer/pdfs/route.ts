@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Course from "@/lib/models/Course";
 import LecturePdf from "@/lib/models/LecturePdf";
+import CourseNotification from "@/lib/models/CourseNotification";
 import { getSession } from "@/lib/auth";
 
 const MAX_PDF_SIZE = 15 * 1024 * 1024;
@@ -27,22 +28,35 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Course not found for this lecturer." }, { status: 404 });
   }
 
-  const pdfs = await LecturePdf.find({ course: courseId, lecturer: session.id })
+  const pdfs = await LecturePdf.find({ course: courseId })
     .select("-fileData")
+    .populate("lecturer", "name email position")
     .sort({ createdAt: -1 })
     .lean();
 
   return NextResponse.json(
-    pdfs.map((pdf) => ({
-      id: String(pdf._id),
-      title: pdf.title,
-      description: pdf.description ?? "",
-      specialNote: pdf.specialNote ?? "",
-      fileName: pdf.fileName,
-      size: pdf.size,
-      active: pdf.active ?? true,
-      createdAt: pdf.createdAt,
-    }))
+    pdfs.map((pdf) => {
+      const lecturer = pdf.lecturer as unknown as { _id?: unknown; name?: string; email?: string; position?: string };
+      const lecturerId = String(lecturer?._id ?? pdf.lecturer);
+
+      return {
+        id: String(pdf._id),
+        title: pdf.title,
+        description: pdf.description ?? "",
+        specialNote: pdf.specialNote ?? "",
+        fileName: pdf.fileName,
+        size: pdf.size,
+        active: pdf.active ?? true,
+        createdAt: pdf.createdAt,
+        isOwner: lecturerId === session.id,
+        lecturer: {
+          id: lecturerId,
+          name: lecturer?.name ?? "Lecturer",
+          email: lecturer?.email ?? "",
+          position: lecturer?.position ?? "",
+        },
+      };
+    })
   );
 }
 
@@ -95,6 +109,15 @@ export async function POST(req: NextRequest) {
     active:   true,
   });
 
+  // Auto-notify students about the new PDF (fire-and-forget)
+  CourseNotification.create({
+    course:      courseId,
+    lecturer:    session.id,
+    title:       `New PDF: ${title}`,
+    description: `${session.name} added a new PDF "${title}" to your course.${description ? ` ${description}` : ""}`,
+    priority:    "normal",
+  }).catch(() => {/* silent */});
+
   return NextResponse.json(
     {
       id: String(pdf._id),
@@ -105,6 +128,13 @@ export async function POST(req: NextRequest) {
       size: pdf.size,
       active: pdf.active,
       createdAt: pdf.createdAt,
+      isOwner: true,
+      lecturer: {
+        id: session.id,
+        name: session.name,
+        email: session.email,
+        position: "",
+      },
     },
     { status: 201 }
   );

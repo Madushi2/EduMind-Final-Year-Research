@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  /* SLIIT-inspired palette */
+  --navy:      #1a3262;
+  --navy-dark: #0e1f45;
+  --navy-mid:  #1e3d72;
+  --gold:      #e8a020;
+  --gold-light:#f0b84a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  /* expose to Tailwind utilities */
+  --color-navy:      var(--navy);
+  --color-navy-dark: var(--navy-dark);
+  --color-navy-mid:  var(--navy-mid);
+  --color-gold:      var(--gold);
+  --color-gold-light:var(--gold-light);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ── Hero slider ── */
+@keyframes fadeSlide {
+  from { opacity: 0; transform: scale(1.04); }
+  to   { opacity: 1; transform: scale(1);    }
+}
+.hero-slide { animation: fadeSlide 1s ease-in-out; }
+
+
+/* ── Card hover ── */
+.card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.card-hover:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(0,0,0,.15);
+}
+
+/* ── Calendar ── */
+.cal-day:hover {
+  background: var(--navy);
+  color: white;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* ── Login button pulse ── */
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0   rgba(232,160,32,.5); }
+  70%  { box-shadow: 0 0 0 10px rgba(232,160,32,0);  }
+  100% { box-shadow: 0 0 0 0   rgba(232,160,32,0);   }
+}
+.btn-pulse { animation: pulse-ring 2.2s infinite; }
+
+/* ── Glassmorphism ── */
+.glass {
+  background: rgba(255,255,255,.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.2);
+}
+
+/* ── Misc animations ── */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0);     }
+}
+.count-up { animation: countUp 0.6s ease-out 0.5s forwards; opacity: 0; }
+
+/* ── Nav underline on hover ── */
+.nav-link {
+  position: relative;
+}
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--gold);
+  transition: width 0.25s ease;
+}
+.nav-link:hover::after { width: 100%; }
+
+html { scroll-behavior: smooth; }
+
+/* ── Hide scrollbar (carousels) ── */
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

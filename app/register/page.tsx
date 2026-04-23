@@ -31,7 +31,7 @@ const POSITIONS = [
 
 /* ── types ────────────────────────────────────────────────────── */
 interface StudentForm {
-  name: string; email: string; contact: string;
+  name: string; email: string; contact:string;
   semester: string;
   gender: string; age: string;
   password: string; confirmPassword: string;

@@ -5,7 +5,7 @@ import Link from "next/link";
 
 /* ── helpers ──────────────────────────────────────────────────── */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_RE = /^\+?[\d\s\-()]{7,15}$/;
+const PHONE_RE = /^\+?[\d\s\-()]{7,20}$/;
 
 const SEMESTER_OPTIONS = [
   "Year 1 Semester 1",

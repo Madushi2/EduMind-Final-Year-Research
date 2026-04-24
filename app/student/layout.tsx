@@ -139,7 +139,7 @@ function buildNavGroups(course: Course | null, unread: number): NavGroup[] {
       courseOnly: true,
       items: [
         { label: "Course",        href: "/student/course",        icon: Ic.course  },
-        { label: "Course PDF",    href: "/student/course-pdf",    icon: Ic.pdf     },
+        //{ label: "Course PDF",    href: "/student/course-pdf",    icon: Ic.pdf     },
         { label: "Generate Quiz", href: "/student/generate-quiz", icon: Ic.quiz    },
         { label: "Lectures",      href: "/student/lectures",      icon: Ic.lecture },
         { label: "Notifications", href: "/student/notifications", icon: Ic.bell, badge: unread || undefined },

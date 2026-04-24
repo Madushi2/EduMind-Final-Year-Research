@@ -24,10 +24,11 @@ interface CurrentUser {
 }
 
 interface NavItem {
-  label:  string;
-  href:   string;
-  icon:   React.ReactNode;
-  badge?: number;
+  label:     string;
+  href:      string;
+  icon:      React.ReactNode;
+  badge?:    number;
+  children?: NavItem[];
 }
 
 interface NavGroup {
@@ -138,8 +139,9 @@ function buildNavGroups(course: Course | null, unread: number): NavGroup[] {
       label: course ? course.code : "Course",
       courseOnly: true,
       items: [
-        { label: "Course",        href: "/student/course",        icon: Ic.course  },
-        //{ label: "Course PDF",    href: "/student/course-pdf",    icon: Ic.pdf     },
+        { label: "Course",        href: "/student/course",        icon: Ic.course,  children: [
+            { label: "Course PDF", href: "/student/course-pdf", icon: Ic.pdf },
+          ] },
         { label: "Generate Quiz", href: "/student/generate-quiz", icon: Ic.quiz    },
         { label: "Lectures",      href: "/student/lectures",      icon: Ic.lecture },
         { label: "Notifications", href: "/student/notifications", icon: Ic.bell, badge: unread || undefined },
@@ -440,37 +442,67 @@ function Sidebar({
                   {group.items.map((item) => {
                     const active = isActive(item.href);
                     const disabled = group.courseOnly && !selectedCourse;
+                    const showChildren = !collapsed && !disabled && item.children && item.children.length > 0;
                     return (
-                      <Link
-                        key={item.href}
-                        href={disabled ? "#" : item.href}
-                        onClick={(event) => { if (disabled) event.preventDefault(); else onClose(); }}
-                        title={collapsed ? item.label : undefined}
-                        className="flex items-center gap-3 rounded-xl transition-all duration-200 relative"
-                        style={{
-                          padding: collapsed ? "10px 0" : "10px 12px",
-                          justifyContent: collapsed ? "center" : "flex-start",
-                          background: active ? "rgba(255,255,255,0.97)" : "transparent",
-                          color: active ? "#1a3262" : disabled ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.62)",
-                          cursor: disabled ? "not-allowed" : "pointer",
-                        }}
-                        onMouseEnter={(event) => { if (!active && !disabled) event.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
-                        onMouseLeave={(event) => { if (!active) event.currentTarget.style.background = "transparent"; }}
-                      >
-                        {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full" style={{ height: 28, background: "#e8a020" }} />}
-                        {!collapsed && item.badge && (
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center text-[10px] font-black rounded-full" style={{ background: "#dc2626", color: "white", minWidth: 18, height: 18, padding: "0 5px" }}>
-                            {item.badge > 99 ? "99+" : item.badge}
-                          </span>
+                      <div key={item.href}>
+                        <Link
+                          href={disabled ? "#" : item.href}
+                          onClick={(event) => { if (disabled) event.preventDefault(); else onClose(); }}
+                          title={collapsed ? item.label : undefined}
+                          className="flex items-center gap-3 rounded-xl transition-all duration-200 relative"
+                          style={{
+                            padding: collapsed ? "10px 0" : "10px 12px",
+                            justifyContent: collapsed ? "center" : "flex-start",
+                            background: active ? "rgba(255,255,255,0.97)" : "transparent",
+                            color: active ? "#1a3262" : disabled ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.62)",
+                            cursor: disabled ? "not-allowed" : "pointer",
+                          }}
+                          onMouseEnter={(event) => { if (!active && !disabled) event.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
+                          onMouseLeave={(event) => { if (!active) event.currentTarget.style.background = "transparent"; }}
+                        >
+                          {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full" style={{ height: 28, background: "#e8a020" }} />}
+                          {!collapsed && item.badge && (
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center text-[10px] font-black rounded-full" style={{ background: "#dc2626", color: "white", minWidth: 18, height: 18, padding: "0 5px" }}>
+                              {item.badge > 99 ? "99+" : item.badge}
+                            </span>
+                          )}
+                          {collapsed && item.badge && (
+                            <span className="absolute top-1.5 right-1.5 flex items-center justify-center text-[9px] font-black rounded-full" style={{ background: "#dc2626", color: "white", minWidth: 14, height: 14, padding: "0 3px" }}>
+                              {item.badge > 9 ? "9+" : item.badge}
+                            </span>
+                          )}
+                          <span style={{ color: active ? "#1a3262" : undefined }}>{item.icon}</span>
+                          {!collapsed && <span className={`text-sm truncate flex-1 ${active ? "font-bold" : "font-semibold"}`}>{item.label}</span>}
+                        </Link>
+
+                        {showChildren && (
+                          <div className="ml-4 mt-0.5 mb-0.5 space-y-0.5 pl-3" style={{ borderLeft: "1.5px solid rgba(255,255,255,0.1)" }}>
+                            {item.children!.map((child) => {
+                              const childActive = isActive(child.href);
+                              return (
+                                <Link
+                                  key={child.href}
+                                  href={child.href}
+                                  onClick={onClose}
+                                  className="flex items-center gap-2.5 rounded-xl transition-all duration-200 relative"
+                                  style={{
+                                    padding: "7px 10px",
+                                    background: childActive ? "rgba(255,255,255,0.97)" : "transparent",
+                                    color: childActive ? "#1a3262" : "rgba(255,255,255,0.5)",
+                                    cursor: "pointer",
+                                  }}
+                                  onMouseEnter={(e) => { if (!childActive) e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
+                                  onMouseLeave={(e) => { if (!childActive) e.currentTarget.style.background = "transparent"; }}
+                                >
+                                  {childActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full" style={{ height: 22, background: "#e8a020" }} />}
+                                  <span style={{ color: childActive ? "#1a3262" : undefined }}>{child.icon}</span>
+                                  <span className={`text-xs truncate flex-1 ${childActive ? "font-bold" : "font-semibold"}`}>{child.label}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
                         )}
-                        {collapsed && item.badge && (
-                          <span className="absolute top-1.5 right-1.5 flex items-center justify-center text-[9px] font-black rounded-full" style={{ background: "#dc2626", color: "white", minWidth: 14, height: 14, padding: "0 3px" }}>
-                            {item.badge > 9 ? "9+" : item.badge}
-                          </span>
-                        )}
-                        <span style={{ color: active ? "#1a3262" : undefined }}>{item.icon}</span>
-                        {!collapsed && <span className={`text-sm truncate flex-1 ${active ? "font-bold" : "font-semibold"}`}>{item.label}</span>}
-                      </Link>
+                      </div>
                     );
                   })}
                 </div>
